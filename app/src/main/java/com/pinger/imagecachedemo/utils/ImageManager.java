@@ -12,44 +12,46 @@ import android.widget.ImageView;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.ref.SoftReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 图片缓存工具类，三级缓存处理
+ * 模拟picasso框架，实现简单的图片三级缓存处理
  * Created by Pinger on 2016/9/25.
  */
 
-public class ImageCacheUtils {
+public class ImageManager {
     private static Context mContext;
 
-    private static ImageCacheUtils instance;
 
 
     /**
-     * 构建出线程池
+     * 构建出线程池，5条线程
      */
-    private static ExecutorService mExecutorService = Executors.newFixedThreadPool(5);
+    private  ExecutorService mExecutorService = Executors.newFixedThreadPool(5);
 
     /**
      * 内存储存图片的集合
      * 使用lrucache缓存图片,这里不能申明在方法里，不然会被覆盖掉
      *  4兆的大小作为缓存
      */
-    static LruCache<String, Bitmap> mImageCache = new LruCache<>(1024 * 1024 * 4);
+    private LruCache<String, SoftReference<Bitmap>> mImageCache = new LruCache<>(1024 * 1024 * 4);
 
     private Handler mHandler = new Handler();
+
 
     /**
      * 获取对象的单利
      *
      * @return
      */
-    private static ImageCacheUtils getInstance() {
+    private static ImageManager instance;
+    private static ImageManager getInstance() {
         if (instance == null) {
-            instance = new ImageCacheUtils();
+            instance = new ImageManager();
         }
 
         return instance;
@@ -61,7 +63,7 @@ public class ImageCacheUtils {
      * @param context
      * @return
      */
-    public static ImageCacheUtils with(Context context) {
+    public static ImageManager with(Context context) {
         mContext = context;
         return getInstance();
     }
@@ -128,9 +130,10 @@ public class ImageCacheUtils {
             imageView.setImageResource(holderResId);
 
             // 1 去内存之中找，有就显示，没有就往下走
-            Bitmap cacheBitmap = mImageCache.get(url);
-
-            if (cacheBitmap != null) {
+            SoftReference<Bitmap> reference = mImageCache.get(url);
+            Bitmap cacheBitmap;
+            if(reference != null){
+                cacheBitmap = reference.get();
                 // 有就显示图片
                 imageView.setImageBitmap(cacheBitmap);
 
@@ -147,7 +150,7 @@ public class ImageCacheUtils {
                 imageView.setImageBitmap(diskBitmap);
 
                 // 保存到内存中去
-                mImageCache.put(url, diskBitmap);
+                mImageCache.put(url, new SoftReference<>(diskBitmap));
 
                 Log.d("RequestCreator:", "磁盘中有图片显示");
 
@@ -190,12 +193,14 @@ public class ImageCacheUtils {
                     Log.d("RequestCreator:", "联网显示图片");
 
                     // 3.1 保存到内存
-                    mImageCache.put(url, bm);
+                    mImageCache.put(url, new SoftReference<>(bm));
 
                     // 3.2 保存到磁盘
+                    // 从url中获取文件名字
                     String fileName = url.substring(url.lastIndexOf("/") + 1);
+
                     // 获取存储路径
-                    File file = new File(getCacheDir(), fileName);
+                    File file = new File(getCacheDir(), MD5Util.encodeMd5(fileName));
                     FileOutputStream os = new FileOutputStream(file);
                     // 将图片转换为文件进行存储
                     bm.compress(Bitmap.CompressFormat.JPEG, 100, os);
@@ -232,8 +237,7 @@ public class ImageCacheUtils {
             // 从url中获取文件名字
             String fileName = url.substring(url.lastIndexOf("/") + 1);
 
-            File file = new File(getCacheDir(), fileName);
-
+            File file = new File(getCacheDir(),MD5Util.encodeMd5(fileName));
             // 确保路径没有问题
             if (file.exists() && file.length() > 0) {
                 // 返回图片
@@ -244,11 +248,12 @@ public class ImageCacheUtils {
         }
 
         /**
-         * 获取缓存目录
+         * 获取缓存路径目录
          */
         private File getCacheDir() {
+
             // 获取保存的文件夹路径
-            File file = null;
+            File file;
             if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
                 // 有SD卡就保存到sd卡
                 file = mContext.getExternalCacheDir();

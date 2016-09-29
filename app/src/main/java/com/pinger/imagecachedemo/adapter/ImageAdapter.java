@@ -9,7 +9,7 @@ import android.widget.TextView;
 
 import com.pinger.imagecachedemo.R;
 import com.pinger.imagecachedemo.bean.ImageBean;
-import com.pinger.imagecachedemo.utils.ImageCacheUtils;
+import com.pinger.imagecachedemo.utils.ImageManager;
 
 import java.util.List;
 
@@ -62,7 +62,7 @@ public class ImageAdapter extends BaseAdapter {
         //Picasso.with(mContext).load(imgUrl).placeholder(R.drawable.ic_default).error(R.drawable.ic_error).into(ivImage);
 
         // 使用自己封装的图片缓存工具类加载图片
-        ImageCacheUtils.with(mContext).load(imgUrl).placeholder(R.drawable.ic_default).error(R.drawable.ic_error).into(ivImage);
+        ImageManager.with(mContext).load(imgUrl).placeholder(R.drawable.ic_default).error(R.drawable.ic_error).into(ivImage);
 
         return convertView;
     }
